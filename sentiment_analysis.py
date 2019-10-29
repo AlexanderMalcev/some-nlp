@@ -1,7 +1,10 @@
+from typing import List
+from json import JSONDecodeError
 from aiohttp import web
 from deeppavlov import build_model, configs
 
 
+#rusentiment_bert work powerfull with russian language
 model = build_model(configs.classifiers.rusentiment_bert, download=False)
 
 app = web.Application(debug=False)
@@ -16,11 +19,17 @@ sent = dict(
 
 
 async def sentiment_analysis(request: web.Request):
-    body: list = await request.json()
+    try:
+        body: List[dict] = await request.json()
+    except JSONDecodeError:
+        raise web.HTTPNoContent(reason= "No content to decode!")
+
     result = []
+
     while body:
         data = {}
         itm_body: dict = body.pop()
+
         text = itm_body.get("text")
         text_id = itm_body.get("id")
 
@@ -30,12 +39,12 @@ async def sentiment_analysis(request: web.Request):
             raise web.HTTPBadRequest(reason="Value mismatch!")
 
         sentiment = model([text])
-        
+
         try:
             assert sentiment[0] in sent
         except AssertionError:
             raise web.HTTPExpectationFailed(reason=f'Unknown sentiment {sentiment[0]}!')
-       
+
         data["id"] = text_id
         data["text"] = sent.get(sentiment[0])
         result.append(data)
